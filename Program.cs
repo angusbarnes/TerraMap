@@ -1,2 +1,2 @@
-﻿using var game = new TerraMap.Game1();
+﻿using var game = new TerraMap.MainGame();
 game.Run();
