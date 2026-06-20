@@ -86,6 +86,8 @@ public class MainGame : Game
         }
     }
 
+    private FrameMetrics frameMetrics = new FrameMetrics(120);
+
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
@@ -194,27 +196,32 @@ public class MainGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        int drawnTiles = 0;
         GraphicsDevice.Clear(Color.CornflowerBlue);
         _spriteBatch.Begin(transformMatrix: mainCamera.GetTransformationMatrix(), samplerState: SamplerState.PointClamp);
         
-        for (int i = Math.Clamp((int) mainCamera.GetPosition().X / 16, 0, 10000); i < Math.Clamp(((int) mainCamera.GetPosition().X + 1280 )/ 16, 0, tilemap.GetLength(0)); i++)
+        for (int i = (int)Math.Clamp(mainCamera.GetPosition().X / 16 * 1/mainCamera.GetZoom(), 0, 1000000); i < Math.Clamp(((int) (mainCamera.GetPosition().X + 1280) * 1/mainCamera.GetZoom())/ 16 + 1, 0, tilemap.GetLength(0)); i++)
         {
-            for (int j = Math.Clamp((int) mainCamera.GetPosition().Y / 16, 0, 10000); j < Math.Clamp(((int) mainCamera.GetPosition().Y + 720 )/ 16, 0, tilemap.GetLength(1)); j++)
+            for (int j = (int)Math.Clamp( mainCamera.GetPosition().Y / 16 * 1/mainCamera.GetZoom(), 0, 1000000); j < Math.Clamp(((int) (mainCamera.GetPosition().Y + 720) * 1/mainCamera.GetZoom())/ 16 + 1, 0, tilemap.GetLength(1)); j++)
             {
                 int tileID = tilemap[i, j];
 
                 _spriteBatch.Draw(texture, new Vector2(i * 16, j * 16), new Rectangle(160 + (int) tileOffsets[tileID].X, (int) tileOffsets[tileID].Y, 16, 16), Color.White);
+                drawnTiles +=1;
             }
         }
 
 
         _spriteBatch.End();
 
+        frameMetrics.Update(gameTime.ElapsedGameTime);
+
         _spriteBatch.Begin();
         MouseState currentMouseState = Mouse.GetState();
         GraphicsMetrics metrics = _graphics.GraphicsDevice.Metrics;
         _spriteBatch.DrawString(debugFont, $"Camera Position: {mainCamera.GetPosition()} | Screen Space Coords: X={currentMouseState.X}, y={currentMouseState.Y} | World Space Coords: X={(currentMouseState.X + mainCamera.GetPosition().X) / mainCamera.GetZoom()}, Y={(currentMouseState.Y + mainCamera.GetPosition().Y) / mainCamera.GetZoom()}", Vector2.One * 5, Color.White);
-         _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount}", Vector2.One * 5 + new Vector2(0, 16), Color.White);
+        _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1/mainCamera.GetZoom()/16) * (mainCamera.Height * 1/mainCamera.GetZoom()/16)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
+        _spriteBatch.DrawString(debugFont, $"FPS: {frameMetrics.AverageFps:F0} ({frameMetrics.AverageFrameTimeMs:F2} ms, {frameMetrics.WorstFrameTimeMs:F2} ms)", Vector2.One * 5 + new Vector2(0, 32), Color.White);
         _spriteBatch.End();
 
         base.Draw(gameTime);
