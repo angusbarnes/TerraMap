@@ -19,9 +19,23 @@ public class MainGame : Game
         public float MaxZoom = 5.0f;
         public float ZoomSensitivity = 0.001f; // Adjusts how fast you zoom
 
+        public int Width = 1280;
+        public int Height = 720;
+        public void SetDimensions(int width, int height)
+        {
+            Width = width;
+            Height = height;
+        }
+
         public Matrix GetTransformationMatrix()
         {
-            return Matrix.CreateScale(new Vector3(_zoom, _zoom, 1)) * Matrix.CreateTranslation(_position.X, _position.Y, 0);;
+            return Matrix.CreateScale(new Vector3(_zoom, _zoom, 1)) * Matrix.CreateTranslation(-_position.X, -_position.Y, 0);;
+        }
+
+        public Rectangle GetFrustum()
+        {
+            // TODO: reduce GC pressure and type casting needed
+            return new Rectangle((int) _position.X, (int) _position.Y, Width, Height);
         }
 
         public void SetZoom(float zoom)
@@ -76,6 +90,7 @@ public class MainGame : Game
     private SpriteBatch _spriteBatch;
 
     private Texture2D texture;
+    private SpriteFont debugFont;
 
     private Camera mainCamera = new();
 
@@ -84,6 +99,7 @@ public class MainGame : Game
     public MainGame()
     {
         _graphics = new GraphicsDeviceManager(this);
+
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
     }
@@ -96,6 +112,8 @@ public class MainGame : Game
         _graphics.PreferredBackBufferHeight = 720;
         _graphics.PreferredBackBufferWidth = 1280;
         _graphics.ApplyChanges();
+
+        mainCamera.SetDimensions(1280, 720);
 
         for (int i = 0; i < tilemap.GetLength(0); i++)
         {
@@ -115,9 +133,11 @@ public class MainGame : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
         texture = Content.Load<Texture2D>("tileset");
+        debugFont = Content.Load<SpriteFont>("Arial");
 
         // TODO: use this.Content to load your game content here
     }
+
     protected override void Update(GameTime gameTime)
     {
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
@@ -137,29 +157,31 @@ public class MainGame : Game
         // Save the state for the next frame update
         _previousMouseState = currentMouseState;
 
-
+        float xTranslate = 0;
+        float yTranslate = 0;
         if(Keyboard.GetState().IsKeyDown(Keys.S))
         {
-            mainCamera.TranslateY(10 * -16f * (float) gameTime.ElapsedGameTime.TotalSeconds);
+            yTranslate += 1;
         }
 
         if(Keyboard.GetState().IsKeyDown(Keys.W))
         {
-            mainCamera.TranslateY(10 * 16f * (float) gameTime.ElapsedGameTime.TotalSeconds);
+            yTranslate += -1;
         }
 
         if(Keyboard.GetState().IsKeyDown(Keys.A))
         {
-            mainCamera.TranslateX(10 * 16f * (float) gameTime.ElapsedGameTime.TotalSeconds);
+            xTranslate += -1;
         }
 
         if(Keyboard.GetState().IsKeyDown(Keys.D))
         {
-            mainCamera.TranslateX(10 * -16f * (float) gameTime.ElapsedGameTime.TotalSeconds);
+            xTranslate += 1;
         }
 
+        float translationScaleFactor = 10 * 12f * (float) gameTime.ElapsedGameTime.TotalSeconds;
+        mainCamera.Translate(xTranslate * translationScaleFactor, yTranslate * translationScaleFactor);
         // TODO: Add your update logic here
-
         base.Update(gameTime);
     }
 
@@ -175,17 +197,6 @@ public class MainGame : Game
         GraphicsDevice.Clear(Color.CornflowerBlue);
         _spriteBatch.Begin(transformMatrix: mainCamera.GetTransformationMatrix(), samplerState: SamplerState.PointClamp);
         
-
-        for (int i = 0; i < 200; i++)
-        {
-            for(int j = 0; j < 200; j++)
-            {
-                
-            }
-        }
-
-
-
         for (int i = (int) mainCamera.GetPosition().X / 16; i < Math.Clamp(((int) mainCamera.GetPosition().X + 1280 )/ 16, 0, tilemap.GetLength(0)); i++)
         {
             for (int j = (int) mainCamera.GetPosition().Y / 16; j < Math.Clamp(((int) mainCamera.GetPosition().Y + 720 )/ 16, 0, tilemap.GetLength(1)); j++)
@@ -197,6 +208,13 @@ public class MainGame : Game
         }
 
 
+        _spriteBatch.End();
+
+        _spriteBatch.Begin();
+        MouseState currentMouseState = Mouse.GetState();
+        GraphicsMetrics metrics = _graphics.GraphicsDevice.Metrics;
+        _spriteBatch.DrawString(debugFont, $"Camera Position: {mainCamera.GetPosition()} | Screen Space Coords: X={currentMouseState.X}, y={currentMouseState.Y} | World Space Coords: X={(currentMouseState.X + mainCamera.GetPosition().X) / mainCamera.GetZoom()}, Y={(currentMouseState.Y + mainCamera.GetPosition().Y) / mainCamera.GetZoom()}", Vector2.One * 5, Color.White);
+         _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount}", Vector2.One * 5 + new Vector2(0, 16), Color.White);
         _spriteBatch.End();
 
         base.Draw(gameTime);
