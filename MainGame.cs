@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -8,6 +9,14 @@ namespace TerraMap;
 
 public class MainGame : Game
 {
+
+    public struct WorldBounds
+    {
+        public int MinX;
+        public int MaxX;
+        public int MinY;
+        public int MaxY;
+    }
 
     class Camera
     {
@@ -27,15 +36,30 @@ public class MainGame : Game
             Height = height;
         }
 
+        public float PixelsPerUnit = 16f; // 1 Tile = 16 Pixels
+
         public Matrix GetTransformationMatrix()
         {
-            return Matrix.CreateScale(new Vector3(_zoom, _zoom, 1)) * Matrix.CreateTranslation(-_position.X, -_position.Y, 0);;
+            return Matrix.CreateTranslation(-_position.X, -_position.Y, 0)
+                * Matrix.CreateScale(PixelsPerUnit)
+                * Matrix.CreateScale(_zoom, _zoom, 1f)
+                * Matrix.CreateTranslation(Width / 2f, Height / 2f, 0);
         }
 
-        public Rectangle GetFrustum()
+        public WorldBounds GetVisibleWorldBounds()
         {
-            // TODO: reduce GC pressure and type casting needed
-            return new Rectangle((int) _position.X, (int) _position.Y, Width, Height);
+            Matrix inverseMatrix = Matrix.Invert(GetTransformationMatrix());
+
+            Vector2 topLeftWorld = Vector2.Transform(Vector2.Zero, inverseMatrix);
+            Vector2 bottomRightWorld = Vector2.Transform(new Vector2(Width, Height), inverseMatrix);
+
+            return new WorldBounds
+            {
+                MinX = (int)MathF.Floor(topLeftWorld.X) - 1,
+                MaxX = (int)MathF.Ceiling(bottomRightWorld.X) + 1,
+                MinY = (int)MathF.Floor(topLeftWorld.Y) - 1,
+                MaxY = (int)MathF.Ceiling(bottomRightWorld.Y) + 1
+            };
         }
 
         public void SetZoom(float zoom)
@@ -86,7 +110,7 @@ public class MainGame : Game
         }
     }
 
-    private FrameMetrics frameMetrics = new FrameMetrics(120);
+    private FrameMetrics frameMetrics = new FrameMetrics(60);
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
@@ -109,7 +133,9 @@ public class MainGame : Game
     }
 
 
-    int[,] tilemap = new int[1000, 1000];
+    const int MapWidth = 10000;
+    const int MapHeight = 10000;
+    int[,] tilemap = new int[MapWidth, MapHeight];
     protected override void Initialize()
     {
         // TODO: Add your initialization logic here
@@ -200,17 +226,27 @@ public class MainGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        // Get the dynamic visibility box for this frame
+        WorldBounds bounds = mainCamera.GetVisibleWorldBounds();
+
+        // Clamp bounds to map dimensions (assuming a 1000x1000 map array layout)
+        int startX = Math.Max(0, bounds.MinX);
+        int endX = Math.Min(MapWidth - 1, bounds.MaxX);
+        int startY = Math.Max(0, bounds.MinY);
+        int endY = Math.Min(MapHeight - 1, bounds.MaxY);
         int drawnTiles = 0;
         GraphicsDevice.Clear(Color.CornflowerBlue);
         _spriteBatch.Begin(transformMatrix: mainCamera.GetTransformationMatrix(), samplerState: SamplerState.PointClamp);
         
-        for (int i = (int)Math.Clamp(mainCamera.GetPosition().X / 16 * 1/mainCamera.GetZoom(), 0, 1000000); i < Math.Clamp(((int) (mainCamera.GetPosition().X + 1280) * 1/mainCamera.GetZoom())/ 16 + 1, 0, tilemap.GetLength(0)); i++)
+        for (int y = startY; y <= endY; y++)
         {
-            for (int j = (int)Math.Clamp( mainCamera.GetPosition().Y / 16 * 1/mainCamera.GetZoom(), 0, 1000000); j < Math.Clamp(((int) (mainCamera.GetPosition().Y + 720) * 1/mainCamera.GetZoom())/ 16 + 1, 0, tilemap.GetLength(1)); j++)
+            for (int x = startX; x <= endX; x++)
             {
-                int tileID = tilemap[i, j];
-
-                _spriteBatch.Draw(texture, new Vector2(i * 16, j * 16), new Rectangle(160 + (int) tileOffsets[tileID].X, (int) tileOffsets[tileID].Y, 16, 16), Color.White);
+                int tileID = tilemap[x, y]; 
+                Vector2 position = new Vector2(x, y);
+                float normScale = 1f / 16f;
+                _spriteBatch.Draw(texture, position, new Rectangle(160 + (int) tileOffsets[tileID].X, (int) tileOffsets[tileID].Y, 16, 16), Color.White, 0f, Vector2.Zero, normScale, SpriteEffects.None, 0f);
+                
                 drawnTiles +=1;
             }
         }
