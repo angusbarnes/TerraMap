@@ -15,7 +15,7 @@ public class MainGame : Game
 
         private Vector2 _position = Vector2.Zero;
 
-        public float MinZoom = 0.1f;
+        public float MinZoom = 0.2f;
         public float MaxZoom = 5.0f;
         public float ZoomSensitivity = 0.001f; // Adjusts how fast you zoom
 
@@ -96,6 +96,8 @@ public class MainGame : Game
 
     private Camera mainCamera = new();
 
+    private bool TURBO_MODE = false;
+
     // Input tracking state
     private MouseState _previousMouseState;
     public MainGame()
@@ -113,6 +115,8 @@ public class MainGame : Game
         // TODO: Add your initialization logic here
         _graphics.PreferredBackBufferHeight = 720;
         _graphics.PreferredBackBufferWidth = 1280;
+        _graphics.SynchronizeWithVerticalRetrace = !TURBO_MODE;
+        IsFixedTimeStep = !TURBO_MODE;
         _graphics.ApplyChanges();
 
         mainCamera.SetDimensions(1280, 720);
@@ -219,7 +223,7 @@ public class MainGame : Game
         _spriteBatch.Begin();
         MouseState currentMouseState = Mouse.GetState();
         GraphicsMetrics metrics = _graphics.GraphicsDevice.Metrics;
-        _spriteBatch.DrawString(debugFont, $"Camera Position: {mainCamera.GetPosition()} | Screen Space Coords: X={currentMouseState.X}, y={currentMouseState.Y} | World Space Coords: X={(currentMouseState.X + mainCamera.GetPosition().X) / mainCamera.GetZoom()}, Y={(currentMouseState.Y + mainCamera.GetPosition().Y) / mainCamera.GetZoom()}", Vector2.One * 5, Color.White);
+        _spriteBatch.DrawString(debugFont, $"Camera Position: {mainCamera.GetPosition()} | Screen Space Coords: X={currentMouseState.X}, y={currentMouseState.Y} | World Space Coords: X={(currentMouseState.X + mainCamera.GetPosition().X) / mainCamera.GetZoom()}, Y={(currentMouseState.Y + mainCamera.GetPosition().Y) / mainCamera.GetZoom()} | Zoom: {mainCamera.GetZoom():F3}", Vector2.One * 5, Color.White);
         _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1/mainCamera.GetZoom()/16) * (mainCamera.Height * 1/mainCamera.GetZoom()/16)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
         _spriteBatch.DrawString(debugFont, $"FPS: {frameMetrics.AverageFps:F0} ({frameMetrics.AverageFrameTimeMs:F2} ms, {frameMetrics.WorstFrameTimeMs:F2} ms)", Vector2.One * 5 + new Vector2(0, 32), Color.White);
         _spriteBatch.End();
