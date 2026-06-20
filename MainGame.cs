@@ -197,9 +197,9 @@ public class MainGame : Game
         GraphicsDevice.Clear(Color.CornflowerBlue);
         _spriteBatch.Begin(transformMatrix: mainCamera.GetTransformationMatrix(), samplerState: SamplerState.PointClamp);
         
-        for (int i = (int) mainCamera.GetPosition().X / 16; i < Math.Clamp(((int) mainCamera.GetPosition().X + 1280 )/ 16, 0, tilemap.GetLength(0)); i++)
+        for (int i = Math.Clamp((int) mainCamera.GetPosition().X / 16, 0, 10000); i < Math.Clamp(((int) mainCamera.GetPosition().X + 1280 )/ 16, 0, tilemap.GetLength(0)); i++)
         {
-            for (int j = (int) mainCamera.GetPosition().Y / 16; j < Math.Clamp(((int) mainCamera.GetPosition().Y + 720 )/ 16, 0, tilemap.GetLength(1)); j++)
+            for (int j = Math.Clamp((int) mainCamera.GetPosition().Y / 16, 0, 10000); j < Math.Clamp(((int) mainCamera.GetPosition().Y + 720 )/ 16, 0, tilemap.GetLength(1)); j++)
             {
                 int tileID = tilemap[i, j];
 
