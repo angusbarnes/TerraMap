@@ -225,12 +225,14 @@ public class MainGame : Game
         float baseSpeed = 5f;
         float scaledSpeed = 10f;
 
-        float translationScaleFactor = (baseSpeed + scaledSpeed / mainCamera.GetZoom()) * (float) gameTime.ElapsedGameTime.TotalSeconds;
-        movement.X = xTranslate;
-        movement.Y = yTranslate;
-        movement = movement.SafelyNormalized();
-
-        mainCamera.Translate(movement * translationScaleFactor);
+        if (xTranslate != 0 || yTranslate != 0)
+        {
+            float translationScaleFactor = (baseSpeed + scaledSpeed / mainCamera.GetZoom()) * (float) gameTime.ElapsedGameTime.TotalSeconds;
+            movement.X = xTranslate;
+            movement.Y = yTranslate;
+            movement.Normalize();
+            mainCamera.Translate(movement * translationScaleFactor);
+        }
 
         base.Update(gameTime);
     }
