@@ -8,7 +8,7 @@ namespace TerraMap;
 /// </summary>
 public class TextureRegion 
 {
-    private Texture2D Texture;
+    public Texture2D Texture;
     private Rectangle SourceRectangle;
 
     /// <summary>
@@ -49,13 +49,14 @@ public class TextureRegion
     /// <param name="layerDepth">The depth of the layer to use when drawing this texture region on screen.</param>
     public void Draw(SpriteBatch spriteBatch, Vector2 position, Color color, float rotation, Vector2 origin, float scale, SpriteEffects effects, float layerDepth)
     {
-        Draw(
-            spriteBatch,
+        spriteBatch.Draw(
+            Texture,
             position,
+            SourceRectangle,
             color,
             rotation,
             origin,
-            new Vector2(scale, scale),
+            scale,
             effects,
             layerDepth
         );
@@ -86,5 +87,4 @@ public class TextureRegion
             layerDepth
         );
     }
-
 }

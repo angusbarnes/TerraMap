@@ -160,14 +160,14 @@ public class MainGame : Game
         texture = Content.Load<Texture2D>("tileset");
         debugFont = Content.Load<SpriteFont>("Arial");
 
-        VariadicTile grassTile = new("grass", texture, [
-            new Rectangle(160, 0, 16, 16),
-            new Rectangle(176, 0, 16, 16),
-            new Rectangle(160, 16, 16, 16),
-            new Rectangle(176, 0, 16, 16)
+        VariadicTile grassTile = new("grass", [
+            new TextureRegion(texture, 160, 0, 16, 16),
+            new TextureRegion(texture, 176, 0, 16, 16),
+            new TextureRegion(texture, 160, 16, 16, 16),
+            new TextureRegion(texture, 176, 0, 16, 16)
         ]);
 
-        Tile waterTile = new("water", texture, 64, 48);
+        Tile waterTile = new("water", new TextureRegion(texture, 64, 48, 16, 16));
 
         for (int i = 0; i < tilemap.GetLength(0); i++)
         {
@@ -258,12 +258,10 @@ public class MainGame : Game
 
     public class Tile
     {
-        public Texture2D SourceTexture;
-        public int XOffset;
-        public int YOffset;
+        public TextureRegion Texture;
         public int Size;
 
-        private Rectangle cachedPair;
+        private float normalisedScale;
 
         private string tileType;
 
@@ -271,22 +269,34 @@ public class MainGame : Game
         {
             tileType = type;
             Size = size;
+            normalisedScale = 1f/size;
         }
 
-        public Tile(string type, Texture2D source, int x, int y, int size = 16)
+        public Tile(string type, TextureRegion texture, int size = 16)
         {
             tileType = type;
-            SourceTexture = source;
-            XOffset = x;
-            YOffset = y;
+            Texture = texture;
             Size = size;
-
-            cachedPair = new Rectangle(x, y, size, size);
+            normalisedScale = 1f/size;
         }
 
-        public virtual Rectangle GetOffset(int x, int y)
+        protected virtual void DrawToScreen(SpriteBatch batch, TextureRegion texture, Vector2 position)
         {
-            return cachedPair;
+            texture.Draw(
+                batch,
+                position,
+                Color.White, 
+                0f, 
+                Vector2.Zero, 
+                normalisedScale, 
+                SpriteEffects.None, 
+                0f
+            );
+        }
+
+        public virtual void Draw(SpriteBatch batch, Vector2 position)
+        {
+            DrawToScreen(batch, Texture, position);
         }
 
         protected int hash(int n) 
@@ -322,35 +332,23 @@ public class MainGame : Game
     public class VariadicTile : Tile
     {
 
-        private Rectangle[] variationOffsets;
-        public VariadicTile(string type, Texture2D source, Rectangle[] offsets) : base(type)
+        private TextureRegion[] textureVariants;
+        public VariadicTile(string type, TextureRegion[] variants) : base(type)
         {
-            variationOffsets = offsets;
+            textureVariants = variants;
         }
 
-        public override Rectangle GetOffset(int x, int y)
+        public override void Draw(SpriteBatch batch, Vector2 position)
         {
-            int variant = get_tile_variation(x, y, variationOffsets.Length);
-            return variationOffsets[get_tile_variation(x, y, variationOffsets.Length)];
+            int x = (int) position.X;
+            int y = (int) position.Y;
+            int variant = get_tile_variation(x, y, textureVariants.Length);
+            DrawToScreen(
+                batch,
+                textureVariants[variant],
+                position
+            );
         }
-    }
-
-    public void DrawTile(Tile tile, Vector2 position)
-    {
-
-        float normScale = 1f / tile.Size;
-
-         _spriteBatch.Draw(
-            texture, 
-            position, 
-            tile.GetOffset((int) position.X, (int) position.Y), 
-            Color.White, 
-            0f, 
-            Vector2.Zero, 
-            normScale, 
-            SpriteEffects.None, 
-            0f
-        );
     }
 
     protected override void Draw(GameTime gameTime)
@@ -374,7 +372,7 @@ public class MainGame : Game
             {
                 pos.X = x;
                 pos.Y = y;
-                DrawTile(tilemap[x, y], pos);
+                tilemap[x, y].Draw(_spriteBatch, pos);
                 //Console.WriteLine($"Attempting to draw {tilemap[x, y]} at x={x}, y={y}");
                 drawnTiles +=1;
             }
