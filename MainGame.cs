@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using TerraMap.WorldGen;
 
 namespace TerraMap;
 
@@ -112,6 +113,7 @@ public class MainGame : Game
     }
 
     private FrameMetrics frameMetrics = new FrameMetrics(60);
+    private GcMetrics _gcMetrics = new GcMetrics();
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
@@ -122,6 +124,7 @@ public class MainGame : Game
     private Camera mainCamera = new();
 
     private bool TURBO_MODE = false;
+    private bool MEM_MONITOR = true;
 
     // Input tracking state
     private MouseState _previousMouseState;
@@ -151,6 +154,8 @@ public class MainGame : Game
         Debug.WriteLine("Generated 1000 x 1000 tilemap");
 
         base.Initialize();
+
+        PerlinNoise noise = new(69);
     }
 
     protected override void LoadContent()
@@ -235,6 +240,7 @@ public class MainGame : Game
         }
 
         base.Update(gameTime);
+        if (MEM_MONITOR) _gcMetrics.Update();
     }
 
     Vector2[] tileOffsets = [
@@ -384,9 +390,17 @@ public class MainGame : Game
         _spriteBatch.Begin();
         MouseState currentMouseState = Mouse.GetState();
         GraphicsMetrics metrics = _graphics.GraphicsDevice.Metrics;
-        _spriteBatch.DrawString(debugFont, $"Camera Position: {mainCamera.GetPosition()} | Screen Space Coords: X={currentMouseState.X}, y={currentMouseState.Y} | World Space Coords: X={(currentMouseState.X + mainCamera.GetPosition().X) / mainCamera.GetZoom()}, Y={(currentMouseState.Y + mainCamera.GetPosition().Y) / mainCamera.GetZoom()} | Zoom: {mainCamera.GetZoom():F3}", Vector2.One * 5, Color.White);
+        _spriteBatch.DrawString(debugFont, $"Camera Position: X={mainCamera.GetPosition().X:F2}, Y={mainCamera.GetPosition().Y:F2} | Screen Space Coords: X={currentMouseState.X:F2}, y={currentMouseState.Y:F2} | World Space Coords: X={(currentMouseState.X + mainCamera.GetPosition().X) / mainCamera.GetZoom():F2}, Y={(currentMouseState.Y + mainCamera.GetPosition().Y) / mainCamera.GetZoom():F2} | Zoom: {mainCamera.GetZoom():F3}", Vector2.One * 5, Color.White);
         _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1/mainCamera.GetZoom()/16) * (mainCamera.Height * 1/mainCamera.GetZoom()/16)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
         _spriteBatch.DrawString(debugFont, $"FPS: {frameMetrics.AverageFps:F0} ({frameMetrics.AverageFrameTimeMs:F2} ms, {frameMetrics.WorstFrameTimeMs:F2} ms)", Vector2.One * 5 + new Vector2(0, 32), Color.White);
+
+        if (MEM_MONITOR)
+        {
+            _spriteBatch.DrawString(debugFont, $"Heap Memory:  {_gcMetrics.TotalMemoryMb:F2} MB", Vector2.One * 5 + new Vector2(0, 48), Color.White);
+            _spriteBatch.DrawString(debugFont, $"Alloc Rate:   {_gcMetrics.AllocRateMbPerSec:F2} MB/s", Vector2.One * 5 + new Vector2(0, 64), Color.White);
+            _spriteBatch.DrawString(debugFont, $"GC Gens (0/1/2): [{_gcMetrics.Gen0Collections}/{_gcMetrics.Gen1Collections}/{_gcMetrics.Gen2Collections}]", Vector2.One * 5 + new Vector2(0, 80), Color.White);
+            _spriteBatch.DrawString(debugFont, $"GC Time Cost:  {_gcMetrics.GcPausePercentage:F2}%", Vector2.One * 5 + new Vector2(0, 96), Color.White);
+        }
         _spriteBatch.End();
 
         base.Draw(gameTime);
