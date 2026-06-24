@@ -137,8 +137,8 @@ public class MainGame : Game
     }
 
 
-    const int MapWidth = 10000;
-    const int MapHeight = 10000;
+    const int MapWidth = 1000;
+    const int MapHeight = 1000;
     Tile[,] tilemap = new Tile[MapWidth, MapHeight];
     protected override void Initialize()
     {
@@ -154,8 +154,7 @@ public class MainGame : Game
         Debug.WriteLine("Generated 1000 x 1000 tilemap");
 
         base.Initialize();
-
-        PerlinNoise noise = new(69);
+        
     }
 
     protected override void LoadContent()
@@ -165,6 +164,8 @@ public class MainGame : Game
         texture = Content.Load<Texture2D>("tileset");
         debugFont = Content.Load<SpriteFont>("Arial");
 
+        PerlinNoise noise = new(69);
+
         VariadicTile grassTile = new("grass", [
             new TextureRegion(texture, 160, 0, 16, 16),
             new TextureRegion(texture, 176, 0, 16, 16),
@@ -172,13 +173,29 @@ public class MainGame : Game
             new TextureRegion(texture, 176, 0, 16, 16)
         ]);
 
-        Tile waterTile = new("water", new TextureRegion(texture, 64, 48, 16, 16));
+        Tile stoneTile = new("stone", new TextureRegion(texture, 64, 48, 16, 16));
+        Tile waterTile = new("water", new TextureRegion(texture, 48, 32, 16, 16));
+        Tile sandTile = new("sand", new TextureRegion(texture, 64, 32, 16, 16));
 
         for (int i = 0; i < tilemap.GetLength(0); i++)
         {
             for (int j = 0; j < tilemap.GetLength(1); j++)
             {
-                tilemap[i, j] = grassTile;
+                float value = noise.SamplefBm(i, j, 1000, octaves: 6, persistence: 0.4f);
+                if (value > 0.7f)
+                {
+                    tilemap[i, j] = stoneTile;
+                } else if ( value > 0.5f)
+                {
+                    tilemap[i, j] = grassTile;
+                } else if (value > 0.47f)
+                {
+                    tilemap[i, j] = sandTile;
+                } else
+                {
+                    tilemap[i, j] = waterTile;
+                }
+                    
             }
         }
 
