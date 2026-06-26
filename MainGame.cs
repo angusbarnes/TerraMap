@@ -42,20 +42,11 @@ public class MainGame : Game
 
         public Matrix GetTransformationMatrix()
         {
-            // Convert float tile position into raw pixel space
-            float rawPixelX = _position.X * PixelsPerUnit;
-            float rawPixelY = _position.Y * PixelsPerUnit;
-
-            // Snap to the nearest integer pixel
-            float snappedPixelX = MathF.Round(rawPixelX);
-            float snappedPixelY = MathF.Round(rawPixelY);
-
-            // Corrected Chain: Scale to pixels FIRST, then translate by pixels
-            return Matrix.CreateScale(PixelsPerUnit)
-                    * Matrix.CreateTranslation(-snappedPixelX, -snappedPixelY, 0)
-                    * Matrix.CreateScale(_zoom, _zoom, 1f)
-                    * Matrix.CreateTranslation(Width / 2f, Height / 2f, 0);
-            }
+            return Matrix.CreateTranslation(-_position.X, -_position.Y, 0)
+                * Matrix.CreateScale(PixelsPerUnit)
+                * Matrix.CreateScale(_zoom, _zoom, 1f)
+                * Matrix.CreateTranslation(Width / 2f, Height / 2f, 0);
+        }
 
         public Vector2 ScreenSpaceToWorldCoords(Vector2 vec)
         {
@@ -150,6 +141,8 @@ public class MainGame : Game
 
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
+
+        TargetElapsedTime = TimeSpan.FromSeconds(1d / 180d);
     }
 
 
@@ -444,7 +437,7 @@ public class MainGame : Game
         int startY = Math.Max(0, bounds.MinY);
         int endY = Math.Min(MapHeight - 1, bounds.MaxY);
         int drawnTiles = 0;
-        GraphicsDevice.Clear(Color.CornflowerBlue);
+        GraphicsDevice.Clear(Color.Red);
         _spriteBatch.Begin(transformMatrix: mainCamera.GetTransformationMatrix(), samplerState: SamplerState.PointClamp);
         
         Vector2 pos = new();
@@ -481,7 +474,7 @@ public class MainGame : Game
         }
 
         _spriteBatch.DrawString(debugFont, $"Camera Position: X={mainCamera.GetPosition().X:F2}, Y={mainCamera.GetPosition().Y:F2} | Screen Space Coords: X={currentMouseState.X:F2}, y={currentMouseState.Y:F2} | World Space Coords: X={mouseWorldPosX :F2}, Y={mouseWorldPosY:F2} | Zoom: {mainCamera.GetZoom():F3} | Hovered Tile: {hoveredTile}", Vector2.One * 5, Color.White);
-        _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1/mainCamera.GetZoom()/16) * (mainCamera.Height * 1/mainCamera.GetZoom()/16)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
+        _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1/mainCamera.GetZoom()/mainCamera.PixelsPerUnit) * (mainCamera.Height * 1/mainCamera.GetZoom()/mainCamera.PixelsPerUnit)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
         _spriteBatch.DrawString(debugFont, $"FPS: {frameMetrics.AverageFps:F0} ({frameMetrics.AverageFrameTimeMs:F2} ms, {frameMetrics.WorstFrameTimeMs:F2} ms)", Vector2.One * 5 + new Vector2(0, 32), Color.White);
 
         if (MEM_MONITOR)
