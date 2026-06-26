@@ -38,14 +38,30 @@ public class MainGame : Game
             Height = height;
         }
 
-        public float PixelsPerUnit = 16f; // 1 Tile = 16 Pixels
+        public float PixelsPerUnit = 32f; // 1 Tile = 16 Pixels
 
         public Matrix GetTransformationMatrix()
         {
-            return Matrix.CreateTranslation(-_position.X, -_position.Y, 0)
-                * Matrix.CreateScale(PixelsPerUnit)
-                * Matrix.CreateScale(_zoom, _zoom, 1f)
-                * Matrix.CreateTranslation(Width / 2f, Height / 2f, 0);
+            // Convert float tile position into raw pixel space
+            float rawPixelX = _position.X * PixelsPerUnit;
+            float rawPixelY = _position.Y * PixelsPerUnit;
+
+            // Snap to the nearest integer pixel
+            float snappedPixelX = MathF.Round(rawPixelX);
+            float snappedPixelY = MathF.Round(rawPixelY);
+
+            // Corrected Chain: Scale to pixels FIRST, then translate by pixels
+            return Matrix.CreateScale(PixelsPerUnit)
+                    * Matrix.CreateTranslation(-snappedPixelX, -snappedPixelY, 0)
+                    * Matrix.CreateScale(_zoom, _zoom, 1f)
+                    * Matrix.CreateTranslation(Width / 2f, Height / 2f, 0);
+            }
+
+        public Vector2 ScreenSpaceToWorldCoords(Vector2 vec)
+        {
+            Matrix inverseMatrix = Matrix.Invert(GetTransformationMatrix());
+
+            return Vector2.Transform(vec, inverseMatrix);
         }
 
         public WorldBounds GetVisibleWorldBounds()
@@ -137,8 +153,8 @@ public class MainGame : Game
     }
 
 
-    const int MapWidth = 1000;
-    const int MapHeight = 1000;
+    const int MapWidth = 256;
+    const int MapHeight = 256;
     Tile[,] tilemap = new Tile[MapWidth, MapHeight];
     protected override void Initialize()
     {
@@ -166,40 +182,79 @@ public class MainGame : Game
 
         PerlinNoise noise = new(69);
 
-        VariadicTile grassTile = new("grass", [
+        VariadicTile grassTile  = new("grass", [
             new TextureRegion(texture, 160, 0, 16, 16),
             new TextureRegion(texture, 176, 0, 16, 16),
             new TextureRegion(texture, 160, 16, 16, 16),
             new TextureRegion(texture, 176, 0, 16, 16)
         ]);
 
-        Tile stoneTile = new("stone", new TextureRegion(texture, 64, 48, 16, 16));
-        Tile waterTile = new("water", new TextureRegion(texture, 48, 32, 16, 16));
-        Tile sandTile = new("sand", new TextureRegion(texture, 64, 32, 16, 16));
+        Tile deepWaterTile = new("deep_water", new TextureRegion(texture, 48, 128, 32, 32), 32);
+        Tile waterTile     = new("water",      new TextureRegion(texture, 48, 96, 32, 32), 32);
+        Tile sandTile      = new("sand",       new TextureRegion(texture, 80, 128, 32, 32), 32);
+        Tile desertTile    = new("desert",     new TextureRegion(texture, 80, 96, 32, 32), 32); // Dry land
+        Tile forestTile    = new("forest",     new TextureRegion(texture, 48, 192, 32, 32), 32); // Wet land
+        Tile stoneTile     = new("stone",      new TextureRegion(texture, 64, 48, 16, 16), 32); // High altitude
+        Tile snowTile      = new("snow",       new TextureRegion(texture, 80, 160, 32, 32), 32); // Highest peak
+
 
         for (int i = 0; i < tilemap.GetLength(0); i++)
         {
             for (int j = 0; j < tilemap.GetLength(1); j++)
             {
-                float value = noise.SamplefBm(i, j, 1000, octaves: 6, persistence: 0.4f);
-                if (value > 0.7f)
+                // ELEVATION MAP (Determines macro structures: oceans, lowlands, mountains)
+                // Scale of 120.0f provides nicely sized continental landmasses.
+                float elevation = noise.SamplefBm(i, j, octaves: 5, scale: 300.0f, persistence: 0.5f, lacunarity: 2.0f);
+
+                // MOISTURE MAP (Determines local environments. Offset prevents identical features)
+                // Scale is larger (200.0f) so climate changes more gradually than raw terrain.
+                float moisture = noise.SamplefBm(i + 15000, j + 15000, octaves: 4, scale: 500.0f, persistence: 0.45f, lacunarity: 2.0f);
+
+                // Deep Water Abyss
+                if (elevation < 0.35f)
                 {
-                    tilemap[i, j] = stoneTile;
-                } else if ( value > 0.5f)
-                {
-                    tilemap[i, j] = grassTile;
-                } else if (value > 0.47f)
-                {
-                    tilemap[i, j] = sandTile;
-                } else
+                    tilemap[i, j] = deepWaterTile;
+                }
+                // Shallow Coastal Waters
+                else if (elevation < 0.46f)
                 {
                     tilemap[i, j] = waterTile;
                 }
-                    
+                // Beaches / Shoreline
+                else if (elevation < 0.50f)
+                {
+                    // Only generate beaches if it isn't a super marshy/wet area
+                    tilemap[i, j] = (moisture > 0.6f) ? forestTile : sandTile;
+                }
+                // Habitable Lowlands / Plains / Forests / Deserts
+                else if (elevation < 0.75f)
+                {
+                    if (moisture < 0.35f)
+                    {
+                        tilemap[i, j] = desertTile; // Arid sand plains
+                    }
+                    else if (moisture < 0.65f)
+                    {
+                        tilemap[i, j] = grassTile;  // Standard temperate plains
+                    }
+                    else
+                    {
+                        tilemap[i, j] = forestTile; // Lush, dense vegetation
+                    }
+                }
+                // Mountain Base / Rocky Ridges
+                else if (elevation < 0.85f)
+                {
+                    // High altitude moisture creates snowy paths instead of raw rock
+                    tilemap[i, j] = (moisture > 0.60f) ? snowTile : stoneTile;
+                }
+                // Alpine Mountain Peaks
+                else
+                {
+                    tilemap[i, j] = snowTile;
+                }
             }
         }
-
-        // TODO: use this.Content to load your game content here
     }
 
     protected override void Update(GameTime gameTime)
@@ -287,6 +342,10 @@ public class MainGame : Game
         private float normalisedScale;
 
         private string tileType;
+
+        public string Type { get {return tileType;}}
+
+        public static readonly Tile EMPTY = new("empty", 0);
 
         public Tile(string type, int size = 16)
         {
@@ -396,6 +455,7 @@ public class MainGame : Game
                 pos.X = x;
                 pos.Y = y;
                 tilemap[x, y].Draw(_spriteBatch, pos);
+
                 //Console.WriteLine($"Attempting to draw {tilemap[x, y]} at x={x}, y={y}");
                 drawnTiles +=1;
             }
@@ -407,7 +467,20 @@ public class MainGame : Game
         _spriteBatch.Begin();
         MouseState currentMouseState = Mouse.GetState();
         GraphicsMetrics metrics = _graphics.GraphicsDevice.Metrics;
-        _spriteBatch.DrawString(debugFont, $"Camera Position: X={mainCamera.GetPosition().X:F2}, Y={mainCamera.GetPosition().Y:F2} | Screen Space Coords: X={currentMouseState.X:F2}, y={currentMouseState.Y:F2} | World Space Coords: X={(currentMouseState.X + mainCamera.GetPosition().X) / mainCamera.GetZoom():F2}, Y={(currentMouseState.Y + mainCamera.GetPosition().Y) / mainCamera.GetZoom():F2} | Zoom: {mainCamera.GetZoom():F3}", Vector2.One * 5, Color.White);
+
+        Vector2 worldMousePosition = mainCamera.ScreenSpaceToWorldCoords(currentMouseState.Position.ToVector2());
+
+        float mouseWorldPosX = worldMousePosition.X;
+        float mouseWorldPosY = worldMousePosition.Y;
+
+        Tile hoveredTile = Tile.EMPTY;
+
+        if ((int) mouseWorldPosX >= 0 && (int) mouseWorldPosY >= 0 &&(int) mouseWorldPosX < tilemap.GetLength(0) && (int) mouseWorldPosY < tilemap.GetLength(1))
+        {
+            hoveredTile = tilemap[(int) mouseWorldPosX, (int) mouseWorldPosY];
+        }
+
+        _spriteBatch.DrawString(debugFont, $"Camera Position: X={mainCamera.GetPosition().X:F2}, Y={mainCamera.GetPosition().Y:F2} | Screen Space Coords: X={currentMouseState.X:F2}, y={currentMouseState.Y:F2} | World Space Coords: X={mouseWorldPosX :F2}, Y={mouseWorldPosY:F2} | Zoom: {mainCamera.GetZoom():F3} | Hovered Tile: {hoveredTile}", Vector2.One * 5, Color.White);
         _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1/mainCamera.GetZoom()/16) * (mainCamera.Height * 1/mainCamera.GetZoom()/16)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
         _spriteBatch.DrawString(debugFont, $"FPS: {frameMetrics.AverageFps:F0} ({frameMetrics.AverageFrameTimeMs:F2} ms, {frameMetrics.WorstFrameTimeMs:F2} ms)", Vector2.One * 5 + new Vector2(0, 32), Color.White);
 
