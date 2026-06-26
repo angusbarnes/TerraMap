@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace TerraMap;
+namespace TerraMap.Profiling;
 
 public class GcMetrics
 {

@@ -2,9 +2,6 @@ using System;
 
 namespace TerraMap.WorldGen;
 
-
-using System;
-
 public class PerlinNoise
 {
     public int Seed { get; private set; }

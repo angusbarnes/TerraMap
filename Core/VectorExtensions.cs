@@ -1,6 +1,6 @@
 using Microsoft.Xna.Framework;
 
-namespace TerraMap;    
+namespace TerraMap.Core;    
 public static class VectorExtensions
 {
     public static Vector2 SafelyNormalized(this Vector2 value)

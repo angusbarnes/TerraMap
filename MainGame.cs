@@ -1,125 +1,18 @@
 using System;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using TerraMap.Core;
+using TerraMap.Profiling;
+using TerraMap.Tilemap;
 using TerraMap.WorldGen;
 
 namespace TerraMap;
 
 public class MainGame : Game
 {
-
-    public struct WorldBounds
-    {
-        public int MinX;
-        public int MaxX;
-        public int MinY;
-        public int MaxY;
-    }
-
-    class Camera
-    {
-        private float _zoom = 1.0f;
-
-        private Vector2 _position = Vector2.Zero;
-
-        public float MinZoom = 0.2f;
-        public float MaxZoom = 5.0f;
-        public float ZoomSensitivity = 0.001f; // Adjusts how fast you zoom
-
-        public int Width = 1280;
-        public int Height = 720;
-        public void SetDimensions(int width, int height)
-        {
-            Width = width;
-            Height = height;
-        }
-
-        public float PixelsPerUnit = 32f; // 1 Tile = 16 Pixels
-
-        public Matrix GetTransformationMatrix()
-        {
-            return Matrix.CreateTranslation(-_position.X, -_position.Y, 0)
-                * Matrix.CreateScale(PixelsPerUnit)
-                * Matrix.CreateScale(_zoom, _zoom, 1f)
-                * Matrix.CreateTranslation(Width / 2f, Height / 2f, 0);
-        }
-
-        public Vector2 ScreenSpaceToWorldCoords(Vector2 vec)
-        {
-            Matrix inverseMatrix = Matrix.Invert(GetTransformationMatrix());
-
-            return Vector2.Transform(vec, inverseMatrix);
-        }
-
-        public WorldBounds GetVisibleWorldBounds()
-        {
-            Matrix inverseMatrix = Matrix.Invert(GetTransformationMatrix());
-
-            Vector2 topLeftWorld = Vector2.Transform(Vector2.Zero, inverseMatrix);
-            Vector2 bottomRightWorld = Vector2.Transform(new Vector2(Width, Height), inverseMatrix);
-
-            return new WorldBounds
-            {
-                MinX = (int)MathF.Floor(topLeftWorld.X) - 1,
-                MaxX = (int)MathF.Ceiling(bottomRightWorld.X) + 1,
-                MinY = (int)MathF.Floor(topLeftWorld.Y) - 1,
-                MaxY = (int)MathF.Ceiling(bottomRightWorld.Y) + 1
-            };
-        }
-
-        public void SetZoom(float zoom)
-        {
-            _zoom = zoom;
-            ClampZoom();
-        }
-
-        public void IncreaseZoom(float zoom)
-        {
-            _zoom += zoom;
-            ClampZoom();
-        }
-
-        private void ClampZoom()
-        {
-            _zoom = MathHelper.Clamp(_zoom, MinZoom, MaxZoom);
-        }
-
-        public float GetZoom()
-        {
-            return _zoom;
-        }
-
-        public Vector2 GetPosition()
-        {
-            return _position;
-        }
-
-        public void Translate(Vector2 vector)
-        {
-            _position += vector;
-        }
-
-        public void Translate(float x, float y)
-        {
-            _position += new Vector2(x, y);
-        }
-
-        public void TranslateX(float x)
-        {
-            Translate(x, 0);
-        }
-
-        public void TranslateY(float y)
-        {
-            Translate(0, y);
-        }
-    }
-
-    private FrameMetrics frameMetrics = new FrameMetrics(60);
+    private FrameMetrics frameMetrics = new FrameMetrics(120);
     private GcMetrics _gcMetrics = new GcMetrics();
 
     private GraphicsDeviceManager _graphics;
@@ -163,7 +56,7 @@ public class MainGame : Game
         Debug.WriteLine("Generated 1000 x 1000 tilemap");
 
         base.Initialize();
-        
+
     }
 
     protected override void LoadContent()
@@ -175,7 +68,7 @@ public class MainGame : Game
 
         PerlinNoise noise = new(69);
 
-        VariadicTile grassTile  = new("grass", [
+        VariadicTile grassTile = new("grass", [
             new TextureRegion(texture, 160, 0, 16, 16),
             new TextureRegion(texture, 176, 0, 16, 16),
             new TextureRegion(texture, 160, 16, 16, 16),
@@ -183,12 +76,12 @@ public class MainGame : Game
         ]);
 
         Tile deepWaterTile = new("deep_water", new TextureRegion(texture, 48, 128, 32, 32), 32);
-        Tile waterTile     = new("water",      new TextureRegion(texture, 48, 96, 32, 32), 32);
-        Tile sandTile      = new("sand",       new TextureRegion(texture, 80, 128, 32, 32), 32);
-        Tile desertTile    = new("desert",     new TextureRegion(texture, 80, 96, 32, 32), 32); // Dry land
-        Tile forestTile    = new("forest",     new TextureRegion(texture, 48, 192, 32, 32), 32); // Wet land
-        Tile stoneTile     = new("stone",      new TextureRegion(texture, 64, 48, 16, 16), 32); // High altitude
-        Tile snowTile      = new("snow",       new TextureRegion(texture, 80, 160, 32, 32), 32); // Highest peak
+        Tile waterTile = new("water", new TextureRegion(texture, 48, 96, 32, 32), 32);
+        Tile sandTile = new("sand", new TextureRegion(texture, 80, 128, 32, 32), 32);
+        Tile desertTile = new("desert", new TextureRegion(texture, 80, 96, 32, 32), 32); // Dry land
+        Tile forestTile = new("forest", new TextureRegion(texture, 48, 192, 32, 32), 32); // Wet land
+        Tile stoneTile = new("stone", new TextureRegion(texture, 64, 48, 16, 16), 32); // High altitude
+        Tile snowTile = new("snow", new TextureRegion(texture, 80, 160, 32, 32), 32); // Highest peak
 
 
         for (int i = 0; i < tilemap.GetLength(0); i++)
@@ -272,22 +165,22 @@ public class MainGame : Game
 
         float xTranslate = 0;
         float yTranslate = 0;
-        if(Keyboard.GetState().IsKeyDown(Keys.S))
+        if (Keyboard.GetState().IsKeyDown(Keys.S) || Keyboard.GetState().IsKeyDown(Keys.Down))
         {
             yTranslate += 1;
         }
 
-        if(Keyboard.GetState().IsKeyDown(Keys.W))
+        if (Keyboard.GetState().IsKeyDown(Keys.W) || Keyboard.GetState().IsKeyDown(Keys.Up))
         {
             yTranslate += -1;
         }
 
-        if(Keyboard.GetState().IsKeyDown(Keys.A))
+        if (Keyboard.GetState().IsKeyDown(Keys.A) || Keyboard.GetState().IsKeyDown(Keys.Left))
         {
             xTranslate += -1;
         }
 
-        if(Keyboard.GetState().IsKeyDown(Keys.D))
+        if (Keyboard.GetState().IsKeyDown(Keys.D) || Keyboard.GetState().IsKeyDown(Keys.Right))
         {
             xTranslate += 1;
         }
@@ -297,7 +190,7 @@ public class MainGame : Game
 
         if (xTranslate != 0 || yTranslate != 0)
         {
-            float translationScaleFactor = (baseSpeed + scaledSpeed / mainCamera.GetZoom()) * (float) gameTime.ElapsedGameTime.TotalSeconds;
+            float translationScaleFactor = (baseSpeed + scaledSpeed / mainCamera.GetZoom()) * (float)gameTime.ElapsedGameTime.TotalSeconds;
             movement.X = xTranslate;
             movement.Y = yTranslate;
             movement.Normalize();
@@ -306,124 +199,6 @@ public class MainGame : Game
 
         base.Update(gameTime);
         if (MEM_MONITOR) _gcMetrics.Update();
-    }
-
-    Vector2[] tileOffsets = [
-        new Vector2(0, 0),
-        new Vector2(0, 16),
-        new Vector2(16, 16),
-        new Vector2(16, 0)
-    ];
-
-    public record IntPair(int X, int Y)
-    {
-        public static implicit operator IntPair(int[] array)
-        {
-            if (array.Length < 2) throw new Exception("Cannot convert array to IntPair as it has less than 2 values");
-            return new IntPair(array[0],  array[1]);
-        }
-
-    };
-
-
-
-    public class Tile
-    {
-        public TextureRegion Texture;
-        public int Size;
-
-        private float normalisedScale;
-
-        private string tileType;
-
-        public string Type { get {return tileType;}}
-
-        public static readonly Tile EMPTY = new("empty", 0);
-
-        public Tile(string type, int size = 16)
-        {
-            tileType = type;
-            Size = size;
-            normalisedScale = 1f/size;
-        }
-
-        public Tile(string type, TextureRegion texture, int size = 16)
-        {
-            tileType = type;
-            Texture = texture;
-            Size = size;
-            normalisedScale = 1f/size;
-        }
-
-        protected virtual void DrawToScreen(SpriteBatch batch, TextureRegion texture, Vector2 position)
-        {
-            texture.Draw(
-                batch,
-                position,
-                Color.White, 
-                0f, 
-                Vector2.Zero, 
-                normalisedScale, 
-                SpriteEffects.None, 
-                0f
-            );
-        }
-
-        public virtual void Draw(SpriteBatch batch, Vector2 position)
-        {
-            DrawToScreen(batch, Texture, position);
-        }
-
-        protected int hash(int n) 
-        {
-            // A modern bit-mixing avalanche step (MurmurHash3 style)
-            uint h = (uint)n;
-            h ^= h >> 16;
-            h *= 0x85ebca6b;
-            h ^= h >> 13;
-            h *= 0xc2b2ae35;
-            h ^= h >> 16;
-            return (int)h;
-        }
-
-        protected int get_tile_variation(int x, int y, int variation_count) 
-        {
-            // Combine coordinates using a bit-rotation/shift to preserve spatial entropy
-            int combinedSeed = x ^ (y << 16) ^ (y >> 16);
-            int seed = hash(combinedSeed);
-            
-            // Use bitwise masking if variation_count is a power of 2 (like 4) for extra speed,
-            // or stick to absolute modulo for safety.
-            return Math.Abs(seed) % variation_count;
-        }
-
-        public override string ToString()
-        {
-            return $"Tile({tileType}, {Size} px)";
-        }
-
-    }
-
-    public class VariadicTile : Tile
-    {
-
-        private TextureRegion[] textureVariants;
-        public VariadicTile(string type, TextureRegion[] variants) : base(type)
-        {
-            textureVariants = variants;
-        }
-
-        public override void Draw(SpriteBatch batch, Vector2 position)
-        {
-            int x = (int) position.X;
-            int y = (int) position.Y;
-            int variant = get_tile_variation(x, y, textureVariants.Length);
-            DrawToScreen(
-                batch,
-                textureVariants[variant],
-                position
-            );
-        }
     }
 
     protected override void Draw(GameTime gameTime)
@@ -439,7 +214,7 @@ public class MainGame : Game
         int drawnTiles = 0;
         GraphicsDevice.Clear(Color.Red);
         _spriteBatch.Begin(transformMatrix: mainCamera.GetTransformationMatrix(), samplerState: SamplerState.PointClamp);
-        
+
         Vector2 pos = new();
         for (int y = startY; y <= endY; y++)
         {
@@ -450,7 +225,7 @@ public class MainGame : Game
                 tilemap[x, y].Draw(_spriteBatch, pos);
 
                 //Console.WriteLine($"Attempting to draw {tilemap[x, y]} at x={x}, y={y}");
-                drawnTiles +=1;
+                drawnTiles += 1;
             }
         }
         _spriteBatch.End();
@@ -468,13 +243,13 @@ public class MainGame : Game
 
         Tile hoveredTile = Tile.EMPTY;
 
-        if ((int) mouseWorldPosX >= 0 && (int) mouseWorldPosY >= 0 &&(int) mouseWorldPosX < tilemap.GetLength(0) && (int) mouseWorldPosY < tilemap.GetLength(1))
+        if ((int)mouseWorldPosX >= 0 && (int)mouseWorldPosY >= 0 && (int)mouseWorldPosX < tilemap.GetLength(0) && (int)mouseWorldPosY < tilemap.GetLength(1))
         {
-            hoveredTile = tilemap[(int) mouseWorldPosX, (int) mouseWorldPosY];
+            hoveredTile = tilemap[(int)mouseWorldPosX, (int)mouseWorldPosY];
         }
 
-        _spriteBatch.DrawString(debugFont, $"Camera Position: X={mainCamera.GetPosition().X:F2}, Y={mainCamera.GetPosition().Y:F2} | Screen Space Coords: X={currentMouseState.X:F2}, y={currentMouseState.Y:F2} | World Space Coords: X={mouseWorldPosX :F2}, Y={mouseWorldPosY:F2} | Zoom: {mainCamera.GetZoom():F3} | Hovered Tile: {hoveredTile}", Vector2.One * 5, Color.White);
-        _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1/mainCamera.GetZoom()/mainCamera.PixelsPerUnit) * (mainCamera.Height * 1/mainCamera.GetZoom()/mainCamera.PixelsPerUnit)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
+        _spriteBatch.DrawString(debugFont, $"Camera Position: X={mainCamera.GetPosition().X:F2}, Y={mainCamera.GetPosition().Y:F2} | Screen Space Coords: X={currentMouseState.X:F2}, y={currentMouseState.Y:F2} | World Space Coords: X={mouseWorldPosX:F2}, Y={mouseWorldPosY:F2} | Zoom: {mainCamera.GetZoom():F3} | Hovered Tile: {hoveredTile}", Vector2.One * 5, Color.White);
+        _spriteBatch.DrawString(debugFont, $"Resolution: {mainCamera.Width}x{mainCamera.Height} | Draw Count: {metrics.DrawCount} | Textures Count: {metrics.TextureCount} | Drawn Tiles: {drawnTiles} (Expected: {(mainCamera.Width * 1 / mainCamera.GetZoom() / mainCamera.PixelsPerUnit) * (mainCamera.Height * 1 / mainCamera.GetZoom() / mainCamera.PixelsPerUnit)})", Vector2.One * 5 + new Vector2(0, 16), Color.White);
         _spriteBatch.DrawString(debugFont, $"FPS: {frameMetrics.AverageFps:F0} ({frameMetrics.AverageFrameTimeMs:F2} ms, {frameMetrics.WorstFrameTimeMs:F2} ms)", Vector2.One * 5 + new Vector2(0, 32), Color.White);
 
         if (MEM_MONITOR)

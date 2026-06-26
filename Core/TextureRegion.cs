@@ -1,7 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace TerraMap;
+namespace TerraMap.Core;
 
 /// <summary>
 /// Represents a rectangular region within a texture.

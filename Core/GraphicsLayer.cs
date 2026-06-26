@@ -1,4 +1,4 @@
-namespace TerraMap;
+namespace TerraMap.Core;
 
 enum GraphicsLayer {
     Tilemap,

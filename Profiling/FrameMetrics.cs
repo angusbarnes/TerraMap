@@ -1,5 +1,6 @@
 using System;
 
+namespace TerraMap.Profiling;
 public class FrameMetrics
 {
     private readonly double[] _frameTimeBuffer;
