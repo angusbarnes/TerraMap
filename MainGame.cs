@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -21,7 +22,7 @@ public class MainGame : Game
     private Texture2D texture;
     private SpriteFont debugFont;
 
-    private Camera mainCamera = new();
+    private Camera mainCamera = new(0.01f, 5f);
 
     private bool TURBO_MODE = false;
     private bool MEM_MONITOR = true;
@@ -39,19 +40,19 @@ public class MainGame : Game
     }
 
 
-    const int MapWidth = 256;
-    const int MapHeight = 256;
-    Tile[,] tilemap = new Tile[MapWidth, MapHeight];
+    int MapWidth = 1000;
+    int MapHeight = 1000;
+    Tile[,] tilemap = new Tile[1000, 1000];
     protected override void Initialize()
     {
         // TODO: Add your initialization logic here
-        _graphics.PreferredBackBufferHeight = 720;
-        _graphics.PreferredBackBufferWidth = 1280;
+        _graphics.PreferredBackBufferHeight = 1080;
+        _graphics.PreferredBackBufferWidth = 1920;
         _graphics.SynchronizeWithVerticalRetrace = !TURBO_MODE;
         IsFixedTimeStep = !TURBO_MODE;
         _graphics.ApplyChanges();
 
-        mainCamera.SetDimensions(1280, 720);
+        mainCamera.SetDimensions(_graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
 
         Debug.WriteLine("Generated 1000 x 1000 tilemap");
 
@@ -66,7 +67,7 @@ public class MainGame : Game
         texture = Content.Load<Texture2D>("tileset");
         debugFont = Content.Load<SpriteFont>("Arial");
 
-        PerlinNoise noise = new(69);
+        PerlinNoise noise = new(24);
 
         VariadicTile grassTile = new("grass", [
             new TextureRegion(texture, 160, 0, 16, 16),
@@ -79,68 +80,100 @@ public class MainGame : Game
         Tile waterTile = new("water", new TextureRegion(texture, 48, 96, 32, 32), 32);
         Tile sandTile = new("sand", new TextureRegion(texture, 80, 128, 32, 32), 32);
         Tile desertTile = new("desert", new TextureRegion(texture, 80, 96, 32, 32), 32); // Dry land
-        Tile forestTile = new("forest", new TextureRegion(texture, 48, 192, 32, 32), 32); // Wet land
+        Tile forestTile = new("forest", new TextureRegion(texture, 112, 96, 128, 128), 128); // Wet land
         Tile stoneTile = new("stone", new TextureRegion(texture, 64, 48, 16, 16), 32); // High altitude
         Tile snowTile = new("snow", new TextureRegion(texture, 80, 160, 32, 32), 32); // Highest peak
 
 
-        for (int i = 0; i < tilemap.GetLength(0); i++)
+        using (FileStream fileStream = new FileStream("Content/australia_mask.png", FileMode.Open))
         {
-            for (int j = 0; j < tilemap.GetLength(1); j++)
+            // Load the texture directly using the GraphicsDevice and the stream
+            Texture2D map = Texture2D.FromStream(GraphicsDevice, fileStream);
+            Color[] rawData = new Color[map.Width * map.Height];
+            map.GetData<Color>(rawData);
+
+            tilemap = new Tile[map.Width, map.Height];
+
+            MapWidth = map.Width;
+            MapHeight = map.Height;
+
+            for (int i = 0; i < map.Width; i++)
             {
-                // ELEVATION MAP (Determines macro structures: oceans, lowlands, mountains)
-                // Scale of 120.0f provides nicely sized continental landmasses.
-                float elevation = noise.SamplefBm(i, j, octaves: 5, scale: 300.0f, persistence: 0.5f, lacunarity: 2.0f);
-
-                // MOISTURE MAP (Determines local environments. Offset prevents identical features)
-                // Scale is larger (200.0f) so climate changes more gradually than raw terrain.
-                float moisture = noise.SamplefBm(i + 15000, j + 15000, octaves: 4, scale: 500.0f, persistence: 0.45f, lacunarity: 2.0f);
-
-                // Deep Water Abyss
-                if (elevation < 0.35f)
+                for (int j = 0; j < map.Height; j++)
                 {
-                    tilemap[i, j] = deepWaterTile;
-                }
-                // Shallow Coastal Waters
-                else if (elevation < 0.46f)
-                {
-                    tilemap[i, j] = waterTile;
-                }
-                // Beaches / Shoreline
-                else if (elevation < 0.50f)
-                {
-                    // Only generate beaches if it isn't a super marshy/wet area
-                    tilemap[i, j] = (moisture > 0.6f) ? forestTile : sandTile;
-                }
-                // Habitable Lowlands / Plains / Forests / Deserts
-                else if (elevation < 0.75f)
-                {
-                    if (moisture < 0.35f)
+                    if(rawData[i + j * map.Width].R <= 0x02 && rawData[i + j * map.Width].B <= 0x02 && rawData[i + j * map.Width].G <= 0x02)
                     {
-                        tilemap[i, j] = desertTile; // Arid sand plains
-                    }
-                    else if (moisture < 0.65f)
+                        tilemap[i, j] = waterTile;
+                    } else
                     {
-                        tilemap[i, j] = grassTile;  // Standard temperate plains
+                        tilemap[i, j] = grassTile;
                     }
-                    else
-                    {
-                        tilemap[i, j] = forestTile; // Lush, dense vegetation
-                    }
-                }
-                // Mountain Base / Rocky Ridges
-                else if (elevation < 0.85f)
-                {
-                    // High altitude moisture creates snowy paths instead of raw rock
-                    tilemap[i, j] = (moisture > 0.60f) ? snowTile : stoneTile;
-                }
-                // Alpine Mountain Peaks
-                else
-                {
-                    tilemap[i, j] = snowTile;
                 }
             }
+
+
         }
+
+
+        // for (int i = 0; i < tilemap.GetLength(0); i++)
+        // {
+        //     for (int j = 0; j < tilemap.GetLength(1); j++)
+        //     {
+        //         // ELEVATION MAP (Determines macro structures: oceans, lowlands, mountains)
+        //         // Scale of 120.0f provides nicely sized continental landmasses.
+        //         float elevation = noise.SamplefBm(i, j, octaves: 5, scale: 30.0f, persistence: 0.5f, lacunarity: 2.0f);
+
+        //         // MOISTURE MAP (Determines local environments. Offset prevents identical features)
+        //         // Scale is larger (200.0f) so climate changes more gradually than raw terrain.
+        //         float moisture = noise.SamplefBm(i + 15000, j + 15000, octaves: 4, scale: 500.0f, persistence: 0.45f, lacunarity: 2.0f);
+
+        //         // Deep Water Abyss
+        //         if (elevation < 0.35f)
+        //         {
+        //             tilemap[i, j] = deepWaterTile;
+        //         }
+        //         // Shallow Coastal Waters
+        //         else if (elevation < 0.46f)
+        //         {
+        //             tilemap[i, j] = waterTile;
+        //         }
+        //         // Beaches / Shoreline
+        //         else if (elevation < 0.50f)
+        //         {
+        //             // Only generate beaches if it isn't a super marshy/wet area
+        //             tilemap[i, j] = (moisture > 0.6f) ? forestTile : sandTile;
+        //         }
+        //         // Habitable Lowlands / Plains / Forests / Deserts
+        //         else if (elevation < 0.75f)
+        //         {
+        //             if (moisture < 0.35f)
+        //             {
+        //                 tilemap[i, j] = desertTile; // Arid sand plains
+        //             }
+        //             else if (moisture < 0.65f)
+        //             {
+        //                 tilemap[i, j] = grassTile;  // Standard temperate plains
+        //             }
+        //             else
+        //             {
+        //                 tilemap[i, j] = forestTile; // Lush, dense vegetation
+        //             }
+        //         }
+        //         // Mountain Base / Rocky Ridges
+        //         else if (elevation < 0.85f)
+        //         {
+        //             // High altitude moisture creates snowy paths instead of raw rock
+        //             tilemap[i, j] = (moisture > 0.60f) ? snowTile : stoneTile;
+        //         }
+        //         // Alpine Mountain Peaks
+        //         else
+        //         {
+        //             tilemap[i, j] = snowTile;
+        //         }
+        //     }
+        // }
+
+        mainCamera.SetPosition(new Vector2(10000, 5500));
     }
 
     protected override void Update(GameTime gameTime)
