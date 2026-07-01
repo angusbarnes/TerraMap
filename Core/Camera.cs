@@ -67,6 +67,11 @@ namespace TerraMap.Core;
         };
     }
 
+    public void SetPosition(Vector2 vec)
+    {
+        _position = vec;
+    }
+
     public void SetZoom(float zoom)
     {
         _zoom = zoom;
